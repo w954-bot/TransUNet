@@ -61,7 +61,18 @@ if __name__ == "__main__":
             'list_dir': './lists/lists_Synapse',
             'num_classes': 9,
         },
+        # Reuse the same dataloader/trainer contract as Synapse:
+        # root_path contains *.npz files with keys: image, label
+        # list_dir contains train.txt listing sample ids
+        'Custom': {
+            'root_path': args.root_path,
+            'list_dir': args.list_dir,
+            'num_classes': args.num_classes,
+        },
     }
+    if dataset_name not in dataset_config:
+        raise ValueError("Unsupported dataset '{}'. Use one of {}".format(dataset_name, list(dataset_config.keys())))
+
     args.num_classes = dataset_config[dataset_name]['num_classes']
     args.root_path = dataset_config[dataset_name]['root_path']
     args.list_dir = dataset_config[dataset_name]['list_dir']
@@ -89,5 +100,5 @@ if __name__ == "__main__":
     net = ViT_seg(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
     net.load_from(weights=np.load(config_vit.pretrained_path))
 
-    trainer = {'Synapse': trainer_synapse,}
+    trainer = {'Synapse': trainer_synapse, 'Custom': trainer_synapse}
     trainer[dataset_name](args, net, snapshot_path)

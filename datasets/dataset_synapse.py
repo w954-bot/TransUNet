@@ -36,14 +36,50 @@ class RandomGenerator(object):
             image, label = random_rot_flip(image, label)
         elif random.random() > 0.5:
             image, label = random_rotate(image, label)
-        x, y = image.shape
-        if x != self.output_size[0] or y != self.output_size[1]:
-            image = zoom(image, (self.output_size[0] / x, self.output_size[1] / y), order=3)  # why not 3?
-            label = zoom(label, (self.output_size[0] / x, self.output_size[1] / y), order=0)
-        image = torch.from_numpy(image.astype(np.float32)).unsqueeze(0)
+        if image.ndim == 2:
+            x, y = image.shape
+            if x != self.output_size[0] or y != self.output_size[1]:
+                image = zoom(image, (self.output_size[0] / x, self.output_size[1] / y), order=3)
+                label = zoom(label, (self.output_size[0] / x, self.output_size[1] / y), order=0)
+            image = torch.from_numpy(image.astype(np.float32)).unsqueeze(0)
+        elif image.ndim == 3:
+            x, y, c = image.shape
+            if x != self.output_size[0] or y != self.output_size[1]:
+                image = zoom(image, (self.output_size[0] / x, self.output_size[1] / y, 1), order=3)
+                label = zoom(label, (self.output_size[0] / x, self.output_size[1] / y), order=0)
+            image = torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1)
+        else:
+            raise ValueError("Expected image ndim 2 or 3, got {}".format(image.ndim))
         label = torch.from_numpy(label.astype(np.float32))
         sample = {'image': image, 'label': label.long()}
         return sample
+
+
+class ResizeGenerator(object):
+    """Resize image/label to target size without random augmentation."""
+    def __init__(self, output_size):
+        self.output_size = output_size
+
+    def __call__(self, sample):
+        image, label = sample['image'], sample['label']
+
+        if image.ndim == 2:
+            x, y = image.shape
+            if x != self.output_size[0] or y != self.output_size[1]:
+                image = zoom(image, (self.output_size[0] / x, self.output_size[1] / y), order=3)
+                label = zoom(label, (self.output_size[0] / x, self.output_size[1] / y), order=0)
+            image = torch.from_numpy(image.astype(np.float32)).unsqueeze(0)
+        elif image.ndim == 3:
+            x, y, c = image.shape
+            if x != self.output_size[0] or y != self.output_size[1]:
+                image = zoom(image, (self.output_size[0] / x, self.output_size[1] / y, 1), order=3)
+                label = zoom(label, (self.output_size[0] / x, self.output_size[1] / y), order=0)
+            image = torch.from_numpy(image.astype(np.float32)).permute(2, 0, 1)
+        else:
+            raise ValueError("Expected image ndim 2 or 3, got {}".format(image.ndim))
+
+        label = torch.from_numpy(label.astype(np.float32))
+        return {'image': image, 'label': label.long()}
 
 
 class Synapse_dataset(Dataset):
@@ -57,7 +93,7 @@ class Synapse_dataset(Dataset):
         return len(self.sample_list)
 
     def __getitem__(self, idx):
-        if self.split == "train":
+        if self.split in ["train", "val", "test"]:
             slice_name = self.sample_list[idx].strip('\n')
             data_path = os.path.join(self.data_dir, slice_name+'.npz')
             data = np.load(data_path)

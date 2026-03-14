@@ -49,6 +49,39 @@ CUDA_VISIBLE_DEVICES=0 python train.py --dataset Synapse --vit_name R50-ViT-B_16
 python test.py --dataset Synapse --vit_name R50-ViT-B_16
 ```
 
+### 5. Train with your own PNG dataset (e.g., esophageal endoscopy)
+
+This repo's training dataloader expects `.npz` files with two keys: `image` and `label`, and a `train.txt` list file. `image` can be grayscale `(H, W)` or RGB `(H, W, 3)`.
+
+1) Convert your `png` image/mask pairs to the expected format:
+
+```bash
+python tools/prepare_endoscopy_png_dataset.py \
+  --image_dir /path/to/images \
+  --mask_dir /path/to/masks \
+  --output_root /path/to/endoscopy_transunet \
+  --train_ratio 0.8 \
+  --binarize_mask
+```
+
+2) Launch training with the custom dataset mode:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python train.py \
+  --dataset Custom \
+  --root_path /path/to/endoscopy_transunet/train_npz \
+  --list_dir /path/to/endoscopy_transunet/lists \
+  --num_classes 2 \
+  --vit_name R50-ViT-B_16
+```
+
+Notes:
+- Use `--num_classes 2` for binary lesion/background segmentation.
+- If your mask already stores class ids (0..N-1), remove `--binarize_mask` and set `--num_classes N`.
+- RGB PNGs are kept as 3-channel arrays by default (no grayscale conversion).
+- `val.txt` is required for per-epoch validation, and `best_model.pth` is saved by best validation Dice.
+- For empty-foreground validation samples: gt/pred both empty is scored as Dice=1.0; gt empty but pred non-empty is Dice=0.0.
+
 ## Reference
 * [Google ViT](https://github.com/google-research/vision_transformer)
 * [ViT-pytorch](https://github.com/jeonsworld/ViT-pytorch)
